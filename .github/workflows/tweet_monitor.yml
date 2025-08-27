@@ -1,7 +1,9 @@
 name: Monitor Binance Tweets
 on:
   schedule:
-    - cron: '*/30 12-22 * * *'
+    # 北京时间 12:00-22:59 每 30 分钟一次
+    # 对应 UTC 04:00-14:59
+    - cron: '*/30 4-14 * * *'
   workflow_dispatch:
 
 jobs:
@@ -11,14 +13,24 @@ jobs:
     - uses: actions/checkout@v3
     - uses: actions/setup-python@v4
       with: { python-version: '3.x' }
-    - uses: actions/cache@v3
+
+    - name: Cache last tweet ID
+      uses: actions/cache@v3
       with:
         path: last_id.txt
         key: last-tweet-${{ github.run_number }}
         restore-keys: last-tweet-
+
     - run: pip install -r requirements.txt
     - name: Run monitor
       env:
-        TWITTER_BEARER_TOKEN: ${{ secrets.TWITTER_BEARER_TOKEN }}
         WECHAT_WEBHOOK_URL: ${{ secrets.WECHAT_WEBHOOK_URL }}
+        TWITTER_BEARER_TOKEN_1: ${{ secrets.TWITTER_BEARER_TOKEN_1 }}
+        TWITTER_BEARER_TOKEN_2: ${{ secrets.TWITTER_BEARER_TOKEN_2 }}
+        TWITTER_BEARER_TOKEN_3: ${{ secrets.TWITTER_BEARER_TOKEN_3 }}
+        TWITTER_BEARER_TOKEN_4: ${{ secrets.TWITTER_BEARER_TOKEN_4 }}
+        TWITTER_BEARER_TOKEN_5: ${{ secrets.TWITTER_BEARER_TOKEN_5 }}
+        TWITTER_BEARER_TOKEN_6: ${{ secrets.TWITTER_BEARER_TOKEN_6 }}
+        TWITTER_BEARER_TOKEN_7: ${{ secrets.TWITTER_BEARER_TOKEN_7 }}
+        TWITTER_BEARER_TOKEN_8: ${{ secrets.TWITTER_BEARER_TOKEN_8 }}
       run: python binance_tweet_monitor.py
