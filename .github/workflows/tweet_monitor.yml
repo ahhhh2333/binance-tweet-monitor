@@ -1,0 +1,24 @@
+name: Monitor Binance Tweets
+on:
+  schedule:
+    - cron: '*/30 * * * *'   # 每 30 分钟
+  workflow_dispatch:
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - uses: actions/setup-python@v4
+      with: { python-version: '3.x' }
+    - uses: actions/cache@v3
+      with:
+        path: last_id.txt
+        key: last-tweet-${{ github.run_number }}
+        restore-keys: last-tweet-
+    - run: pip install -r requirements.txt
+    - name: Run monitor
+      env:
+        TWITTER_BEARER_TOKEN: ${{ secrets.TWITTER_BEARER_TOKEN }}
+        WECHAT_WEBHOOK_URL: ${{ secrets.WECHAT_WEBHOOK_URL }}
+      run: python binance_tweet_monitor.py
