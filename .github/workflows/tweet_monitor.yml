@@ -1,7 +1,7 @@
 name: Monitor Binance Tweets
 on:
   schedule:
-    - cron: '*/30 * * * *'   # 每 30 分钟
+    - cron: '0 * * * *'   # 每整点一次（24 次/月，N 个 Token 就是 24×N 次）
   workflow_dispatch:
 
 jobs:
