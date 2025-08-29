@@ -1,0 +1,68 @@
+name: Binance Tweet Monitor
+
+on:
+  schedule:
+    # 北京时间11:00-23:00，每30分钟触发一次
+    # UTC时间：03:00-15:00 (北京时间-8小时)
+    - cron: '0,30 3-15 * * *'
+  workflow_dispatch:
+    # 允许手动触发
+
+env:
+  PYTHONIOENCODING: utf-8
+  PYTHONUNBUFFERED: 1
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+    
+    - name: Setup Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+    
+    - name: Load cache
+      uses: actions/cache@v4
+      with:
+        path: processed_tweets.json
+        key: tweets-${{ github.run_number }}
+        restore-keys: tweets-
+    
+    - name: Run monitor
+      env:
+        # Twitter API Tokens (1-8)
+        TWITTER_BEARER_TOKEN_1: ${{ secrets.TWITTER_BEARER_TOKEN_1 }}
+        TWITTER_BEARER_TOKEN_2: ${{ secrets.TWITTER_BEARER_TOKEN_2 }}
+        TWITTER_BEARER_TOKEN_3: ${{ secrets.TWITTER_BEARER_TOKEN_3 }}
+        TWITTER_BEARER_TOKEN_4: ${{ secrets.TWITTER_BEARER_TOKEN_4 }}
+        TWITTER_BEARER_TOKEN_5: ${{ secrets.TWITTER_BEARER_TOKEN_5 }}
+        TWITTER_BEARER_TOKEN_6: ${{ secrets.TWITTER_BEARER_TOKEN_6 }}
+        TWITTER_BEARER_TOKEN_7: ${{ secrets.TWITTER_BEARER_TOKEN_7 }}
+        TWITTER_BEARER_TOKEN_8: ${{ secrets.TWITTER_BEARER_TOKEN_8 }}
+        
+        # 微信机器人
+        WECHAT_WEBHOOK_URL: ${{ secrets.WECHAT_WEBHOOK_URL }}
+        
+        # 时区
+        TZ: Asia/Shanghai
+        
+      run: python main.py
+    
+    - name: Commit data
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add processed_tweets.json || true
+        git diff --staged --quiet || git commit -m "Update processed tweets [skip ci]"
+        git push || true
