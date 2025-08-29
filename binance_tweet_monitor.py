@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
 binance_tweet_monitor.py
-单 Token 调试版：只用 TWITTER_BEARER_TOKEN
+单 Token 版：使用 TWITTER_BEARER_TOKEN
+获取完整长文（note_tweet），推送到企业微信机器人
 """
 import os
 import requests
@@ -35,8 +36,6 @@ def main() -> None:
     if not token:
         print("❌ 没有 Bearer Token，请检查 Secrets 中的 TWITTER_BEARER_TOKEN")
         return
-
-    print(f"🔍 使用 Token：{token[:10]}...")
 
     client = tweepy.Client(bearer_token=token)
     user = client.get_user(username=SCREEN_NAME)
