@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
 binance_tweet_monitor.py
-单 Token 版：使用 TWITTER_BEARER_TOKEN
-获取完整长文（note_tweet），推送到企业微信机器人
+使用 8 个 Twitter Bearer Token 轮询 @binancezh，
+优先使用 note_tweet 获取完整长文（>280 字不再截断）。
 """
 import os
 import requests
@@ -10,8 +10,9 @@ import tweepy
 
 CACHE_FILE   = "last_id.txt"
 SCREEN_NAME  = "binancezh"
-KEYWORD      = "alpha"
+KEYWORD      = "alpha"          # 大小写不敏感
 
+# ---------- 工具 ----------
 def load_last_id() -> int:
     try:
         if os.path.exists(CACHE_FILE):
@@ -31,47 +32,56 @@ def push_wechat(msg: str) -> None:
     resp = requests.post(url, json=payload, timeout=10)
     resp.raise_for_status()
 
+# ---------- 主逻辑 ----------
 def main() -> None:
-    token = os.getenv("TWITTER_BEARER_TOKEN")
-    if not token:
-        print("❌ 没有 Bearer Token，请检查 Secrets 中的 TWITTER_BEARER_TOKEN")
+    tokens = [t for t in [
+        os.getenv("TWITTER_BEARER_TOKEN_1"),
+        os.getenv("TWITTER_BEARER_TOKEN_2"),
+        os.getenv("TWITTER_BEARER_TOKEN_3"),
+        os.getenv("TWITTER_BEARER_TOKEN_4"),
+        os.getenv("TWITTER_BEARER_TOKEN_5"),
+        os.getenv("TWITTER_BEARER_TOKEN_6"),
+        os.getenv("TWITTER_BEARER_TOKEN_7"),
+        os.getenv("TWITTER_BEARER_TOKEN_8"),
+    ] if t]
+
+    if not tokens:
+        print("❌ 没有任何可用的 Bearer Token，请检查 8 个 Secrets")
         return
 
-    client = tweepy.Client(bearer_token=token)
-    user = client.get_user(username=SCREEN_NAME)
-    if not user.data:
-        print("❌ 无法获取用户")
-        return
-    user_id = user.data.id
+    for idx, token in enumerate(tokens, 1):
+        try:
+            client = tweepy.Client(bearer_token=token)
+            user = client.get_user(username=SCREEN_NAME)
+            last = load_last_id()
 
-    last_id = load_last_id()
-
-    tweets = client.get_users_tweets(
-        id=user_id,
-        max_results=20,
-        since_id=last_id,
-        tweet_fields=["id", "text", "note_tweet"]
-    )
-
-    if not tweets.data:
-        print("✅ 暂无新推文")
-        return
-
-    new_last = 0
-    for t in reversed(tweets.data):
-        full_text = t.note_tweet.text if t.note_tweet else t.text
-        if KEYWORD in full_text.lower():
-            msg = (
-                f"【币安 Alpha 新推文】\n{full_text}\n"
-                f"https://twitter.com/{SCREEN_NAME}/status/{t.id}"
+            tweets = client.get_users_tweets(
+                id=user.data.id,
+                max_results=20,
+                since_id=last,
+                tweet_fields=["id", "text", "note_tweet"]  # 关键
             )
-            push_wechat(msg)
-            new_last = max(new_last, int(t.id))
-            print(f"📤 已推送：{t.id}")
 
-    if new_last:
-        save_last_id(new_last)
-        print(f"💾 更新 last_id → {new_last}")
+            if tweets.data:
+                new_last = 0
+                for t in reversed(tweets.data):
+                    full_text = t.note_tweet.text if t.note_tweet else t.text
+                    if KEYWORD in full_text.lower():
+                        msg = (
+                            f"【币安 Alpha 新推文】\n{full_text}\n"
+                            f"https://twitter.com/{SCREEN_NAME}/status/{t.id}"
+                        )
+                        push_wechat(msg)
+                        new_last = max(new_last, int(t.id))
+                        print(f"📤 已推送：{t.id} (Token {idx})")
+                if new_last:
+                    save_last_id(new_last)
+                    print(f"💾 更新 last_id → {new_last}")
+                    return
+        except Exception as e:
+            print(f"⚠️  Token {idx} 失败: {e}")
+
+    print("❌ 所有 8 个 Token 均已用完或失败")
 
 if __name__ == "__main__":
     main()
