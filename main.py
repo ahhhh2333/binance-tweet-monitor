@@ -125,6 +125,19 @@ class BinanceTwitterMonitor:
         logger.error("所有Token都不可用")
         return None
     
+    def get_single_tweet(self, tweet_id: str) -> Optional[Dict]:
+        """获取单条推文的完整内容"""
+        url = f"https://api.twitter.com/2/tweets/{tweet_id}"
+        params = {
+            'tweet.fields': 'created_at,public_metrics,entities,context_annotations',
+            'expansions': 'author_id'
+        }
+        
+        result = self._make_twitter_request(url, params)
+        if result and 'data' in result:
+            return result['data']
+        return None
+    
     def get_user_tweets(self) -> List[Dict]:
         """获取用户推文"""
         # 先获取用户ID
@@ -138,19 +151,33 @@ class BinanceTwitterMonitor:
         
         user_id = user_data['data']['id']
         
-        # 获取推文
+        # 获取推文列表
         tweets_url = f"https://api.twitter.com/2/users/{user_id}/tweets"
         tweets_params = {
             'max_results': 10,
-            'tweet.fields': 'created_at,public_metrics',
+            'tweet.fields': 'created_at,public_metrics,entities,context_annotations',
             'exclude': 'retweets,replies'
         }
         
         tweets_data = self._make_twitter_request(tweets_url, tweets_params)
-        if tweets_data and 'data' in tweets_data:
-            return tweets_data['data']
+        if not tweets_data or 'data' not in tweets_data:
+            return []
         
-        return []
+        # 获取每条推文的完整内容
+        complete_tweets = []
+        for tweet in tweets_data['data']:
+            # 如果推文看起来被截断了，获取完整内容
+            if len(tweet['text']) >= 275 or tweet['text'].endswith('…'):
+                logger.info(f"推文 {tweet['id']} 可能被截断，获取完整内容")
+                complete_tweet = self.get_single_tweet(tweet['id'])
+                if complete_tweet:
+                    complete_tweets.append(complete_tweet)
+                else:
+                    complete_tweets.append(tweet)
+            else:
+                complete_tweets.append(tweet)
+        
+        return complete_tweets
     
     def contains_alpha_keywords(self, text: str) -> bool:
         """检查是否包含Alpha关键词"""
@@ -164,6 +191,10 @@ class BinanceTwitterMonitor:
             return False
         
         try:
+            # 企业微信消息长度限制，如果太长就截断
+            if len(content.encode('utf-8')) > 3800:
+                content = content[:1800] + "\n\n...(内容较长，请点击链接查看完整内容)"
+            
             data = {
                 "msgtype": "text",
                 "text": {"content": content}
@@ -197,9 +228,19 @@ class BinanceTwitterMonitor:
         
         tweet_url = f"https://twitter.com/{self.target_user}/status/{tweet['id']}"
         
+        # 获取完整推文内容
+        full_text = tweet['text']
+        
+        # 处理URL展开
+        if 'entities' in tweet and 'urls' in tweet['entities']:
+            for url_entity in tweet['entities']['urls']:
+                if 'expanded_url' in url_entity and 'display_url' in url_entity:
+                    # 如果推文中包含短链接，保持原样但添加说明
+                    pass
+        
         return f"""🚀 币安Alpha积分推文提醒
 
-📝 内容: {tweet['text']}
+📝 内容: {full_text}
 
 🕐 时间: {beijing_time.strftime('%Y-%m-%d %H:%M:%S')} (北京时间)
 
@@ -235,16 +276,18 @@ class BinanceTwitterMonitor:
                 # 检查是否包含Alpha关键词
                 if self.contains_alpha_keywords(tweet['text']):
                     new_alpha_tweets.append(tweet)
-                    logger.info(f"发现Alpha推文: {tweet_id}")
+                    logger.info(f"发现Alpha推文: {tweet_id} (长度: {len(tweet['text'])}字符)")
                 
                 # 标记为已处理
                 self.processed_ids.append(tweet_id)
             
-            # 发送通知
+            # 按时间顺序发送通知（从旧到新）
+            new_alpha_tweets.sort(key=lambda x: x['created_at'])
+            
             for tweet in new_alpha_tweets:
                 message = self.format_message(tweet)
                 self.send_wechat_message(message)
-                time.sleep(2)  # 避免频率限制
+                time.sleep(3)  # 避免频率限制
             
             # 保存处理记录
             self._save_processed_tweets()
