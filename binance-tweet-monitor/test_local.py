@@ -145,11 +145,7 @@ def test_wechat_notification():
             return False
         
         # 创建微信机器人
-        bot = WeChatBot(
-            webhook_url=webhook_url,
-            secret=os.getenv('WECHAT_SECRET', ''),
-            mentioned_list=os.getenv('WECHAT_MENTIONED_LIST', '').split(',') if os.getenv('WECHAT_MENTIONED_LIST') else []
-        )
+        bot = WeChatBot(webhook_url)
         
         # 发送测试消息
         test_message = """🧪 币安推特监控测试消息
