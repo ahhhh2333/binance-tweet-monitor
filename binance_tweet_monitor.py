@@ -2,7 +2,7 @@
 """
 binance_tweet_monitor.py
 使用 8 个 Twitter Bearer Token 轮询 @binancezh，
-优先使用 note_tweet 获取完整长文（>280 字不再截断）。
+仅推送含关键词“alpha”且真正未推送过的新推文。
 """
 import os
 import requests
@@ -12,7 +12,7 @@ CACHE_FILE   = "last_id.txt"
 SCREEN_NAME  = "binancezh"
 KEYWORD      = "alpha"          # 大小写不敏感
 
-# ---------- 工具 ----------
+# ---------- 工具函数 ----------
 def load_last_id() -> int:
     try:
         if os.path.exists(CACHE_FILE):
@@ -34,6 +34,7 @@ def push_wechat(msg: str) -> None:
 
 # ---------- 主逻辑 ----------
 def main() -> None:
+    # 收集所有非空 Token（共 8 个）
     tokens = [t for t in [
         os.getenv("TWITTER_BEARER_TOKEN_1"),
         os.getenv("TWITTER_BEARER_TOKEN_2"),
@@ -59,16 +60,15 @@ def main() -> None:
                 id=user.data.id,
                 max_results=20,
                 since_id=last,
-                tweet_fields=["id", "text", "note_tweet"]  # 关键
+                tweet_fields=["id", "text"]
             )
 
             if tweets.data:
                 new_last = 0
                 for t in reversed(tweets.data):
-                    full_text = t.note_tweet.text if t.note_tweet else t.text
-                    if KEYWORD in full_text.lower():
+                    if KEYWORD in t.text.lower():
                         msg = (
-                            f"【币安 Alpha 新推文】\n{full_text}\n"
+                            f"【币安 Alpha 新推文】\n{t.text}\n"
                             f"https://twitter.com/{SCREEN_NAME}/status/{t.id}"
                         )
                         push_wechat(msg)
@@ -77,7 +77,7 @@ def main() -> None:
                 if new_last:
                     save_last_id(new_last)
                     print(f"💾 更新 last_id → {new_last}")
-                    return
+                    return  # 成功即退出
         except Exception as e:
             print(f"⚠️  Token {idx} 失败: {e}")
 
