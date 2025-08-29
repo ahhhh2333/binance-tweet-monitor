@@ -29,7 +29,7 @@ jobs:
         fetch-depth: 1
     
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: '3.11'
         cache: 'pip'
@@ -46,7 +46,7 @@ jobs:
         mkdir -p config
     
     - name: Load cached data
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: |
           data/
@@ -68,10 +68,8 @@ jobs:
         TWITTER_BEARER_TOKEN_7: ${{ secrets.TWITTER_BEARER_TOKEN_7 }}
         TWITTER_BEARER_TOKEN_8: ${{ secrets.TWITTER_BEARER_TOKEN_8 }}
         
-        # 微信机器人配置
+        # 微信机器人配置 - 只需要Webhook URL
         WECHAT_WEBHOOK_URL: ${{ secrets.WECHAT_WEBHOOK_URL }}
-        WECHAT_SECRET: ${{ secrets.WECHAT_SECRET }}
-        WECHAT_MENTIONED_LIST: ${{ secrets.WECHAT_MENTIONED_LIST }}
         
         # 监控配置
         TARGET_USERNAME: "binancezh"
@@ -85,7 +83,7 @@ jobs:
     
     - name: Upload logs on failure
       if: failure()
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: error-logs-${{ github.run_number }}
         path: logs/
