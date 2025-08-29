@@ -56,10 +56,8 @@ class Config:
                 if single_token:
                     self.twitter_bearer_tokens = [single_token]
         
-        # 微信机器人配置
+        # 微信机器人配置 - 只需要Webhook URL
         self.wechat_webhook_url = os.getenv('WECHAT_WEBHOOK_URL', '')
-        self.wechat_secret = os.getenv('WECHAT_SECRET', '')
-        self.wechat_mentioned_list = os.getenv('WECHAT_MENTIONED_LIST', '').split(',') if os.getenv('WECHAT_MENTIONED_LIST') else []
         
         # 监控配置
         self.target_username = os.getenv('TARGET_USERNAME', 'binancezh')
@@ -90,12 +88,10 @@ class Config:
 
 
 class WeChatBot:
-    """微信机器人"""
+    """微信机器人 - 简化版，只需要Webhook URL"""
     
-    def __init__(self, webhook_url: str, secret: str = '', mentioned_list: Optional[List[str]] = None):
+    def __init__(self, webhook_url: str):
         self.webhook_url = webhook_url
-        self.secret = secret
-        self.mentioned_list = mentioned_list or []
     
     def send_message(self, content: str) -> bool:
         """发送微信消息"""
@@ -107,8 +103,7 @@ class WeChatBot:
             data = {
                 "msgtype": "text",
                 "text": {
-                    "content": content,
-                    "mentioned_list": self.mentioned_list
+                    "content": content
                 }
             }
             
@@ -141,11 +136,7 @@ class BinanceTweetMonitor:
     def __init__(self):
         self.config = Config()
         self.twitter_api = TwitterAPIManager(self.config.twitter_bearer_tokens)
-        self.wechat_bot = WeChatBot(
-            self.config.wechat_webhook_url,
-            self.config.wechat_secret,
-            self.config.wechat_mentioned_list
-        )
+        self.wechat_bot = WeChatBot(self.config.wechat_webhook_url)
         
         # 已处理推文记录
         self.processed_tweets_file = 'data/processed_tweets.json'
