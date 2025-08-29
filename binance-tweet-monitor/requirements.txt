@@ -1,0 +1,8 @@
+# Twitter API v2 请求
+requests>=2.31.0
+
+# 其他工具
+python-dateutil>=2.8.0
+
+# 可选依赖（用于增强功能）
+python-dotenv>=1.0.0
