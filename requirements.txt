@@ -1,0 +1,5 @@
+# Twitter API请求
+requests>=2.31.0
+
+# 其他工具（可选）
+python-dateutil>=2.8.0
