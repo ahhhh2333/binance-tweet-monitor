@@ -277,13 +277,10 @@ class BinanceTwitterMonitor:
 
 📝 内容: {full_text}
 
-🔍 匹配关键词: {', '.join(matched_keywords)}
-
 🕐 时间: {beijing_time.strftime('%Y-%m-%d %H:%M:%S')} (北京时间)
 
 🔗 链接: {tweet_url}
 
-💰 #币安 #Alpha积分 #推特监控"""
     
     def run(self):
         """运行监控"""
