@@ -28,18 +28,36 @@ class BinanceTwitterMonitor:
         self.target_user = 'binancezh'
         self.current_token_index = 0
         
-        # Alpha关键词
+        # 扩展的Alpha关键词列表
         self.alpha_keywords = [
+            # 基础Alpha关键词
             'alpha', 'Alpha', 'ALPHA', 'aplha', 'Aplha',
+            
+            # 积分相关
             '积分', 'points', 'Points', 'point', 'Point',
-            'Alpha积分', 'alpha积分', 'Alpha Points', 'alpha points'
+            
+            # 空投相关
+            '空投', 'airdrop', 'Airdrop', 'AIRDROP',
+            'airdrops', 'Airdrops', 'AIRDROPS',
+            
+            # 活动相关
+            '领取', 'claim', 'Claim', 'CLAIM',
+            '申领', '代币空投',
+            
+            # 组合关键词
+            'Alpha积分', 'alpha积分', 'Alpha Points', 'alpha points',
+            'Alpha空投', 'alpha空投', 'ALPHA空投',
+            '币安Alpha', '币安alpha', 'Binance Alpha', 'binance alpha',
+            
+            # 奖励相关
+            '奖励', 'reward', 'Reward', 'REWARD', 'rewards'
         ]
         
         # 数据文件
         self.data_file = 'processed_tweets.json'
         self.processed_ids = self._load_processed_tweets()
         
-        logger.info(f"初始化完成，共{len(self.bearer_tokens)}个Token")
+        logger.info(f"初始化完成，共{len(self.bearer_tokens)}个Token，{len(self.alpha_keywords)}个关键词")
     
     def _get_bearer_tokens(self) -> List[str]:
         """获取所有Bearer Token"""
@@ -179,10 +197,23 @@ class BinanceTwitterMonitor:
         
         return complete_tweets
     
-    def contains_alpha_keywords(self, text: str) -> bool:
-        """检查是否包含Alpha关键词"""
+    def contains_alpha_keywords(self, text: str) -> List[str]:
+        """检查是否包含Alpha关键词，返回匹配的关键词列表"""
         text_lower = text.lower()
-        return any(keyword.lower() in text_lower for keyword in self.alpha_keywords)
+        matched_keywords = []
+        
+        for keyword in self.alpha_keywords:
+            if keyword.lower() in text_lower:
+                matched_keywords.append(keyword)
+        
+        # 添加调试日志
+        logger.info(f"检查推文: {text[:100]}...")
+        if matched_keywords:
+            logger.info(f"匹配到关键词: {matched_keywords}")
+        else:
+            logger.info("未匹配到任何关键词")
+        
+        return matched_keywords
     
     def send_wechat_message(self, content: str) -> bool:
         """发送企业微信消息"""
@@ -220,7 +251,7 @@ class BinanceTwitterMonitor:
         
         return False
     
-    def format_message(self, tweet: Dict) -> str:
+    def format_message(self, tweet: Dict, matched_keywords: List[str]) -> str:
         """格式化推文消息"""
         beijing_tz = timezone(timedelta(hours=8))
         tweet_time = datetime.fromisoformat(tweet['created_at'].replace('Z', '+00:00'))
@@ -231,16 +262,11 @@ class BinanceTwitterMonitor:
         # 获取完整推文内容
         full_text = tweet['text']
         
-        # 处理URL展开
-        if 'entities' in tweet and 'urls' in tweet['entities']:
-            for url_entity in tweet['entities']['urls']:
-                if 'expanded_url' in url_entity and 'display_url' in url_entity:
-                    # 如果推文中包含短链接，保持原样但添加说明
-                    pass
-        
         return f"""🚀 币安Alpha积分推文提醒
 
 📝 内容: {full_text}
+
+🔍 匹配关键词: {', '.join(matched_keywords)}
 
 🕐 时间: {beijing_time.strftime('%Y-%m-%d %H:%M:%S')} (北京时间)
 
@@ -252,6 +278,7 @@ class BinanceTwitterMonitor:
         """运行监控"""
         try:
             logger.info("开始执行推特监控")
+            logger.info(f"当前时间: {datetime.now()}")
             
             # 检查监控时间
             if not self._is_monitoring_time():
@@ -264,19 +291,29 @@ class BinanceTwitterMonitor:
                 logger.info("未获取到推文")
                 return
             
+            logger.info(f"获取到 {len(tweets)} 条推文")
+            
             # 处理新推文
             new_alpha_tweets = []
             for tweet in tweets:
                 tweet_id = tweet['id']
+                tweet_text = tweet['text']
+                
+                logger.info(f"检查推文 {tweet_id}: {tweet_text[:50]}...")
                 
                 # 跳过已处理的推文
                 if tweet_id in self.processed_ids:
+                    logger.info(f"推文 {tweet_id} 已处理过，跳过")
                     continue
                 
                 # 检查是否包含Alpha关键词
-                if self.contains_alpha_keywords(tweet['text']):
+                matched_keywords = self.contains_alpha_keywords(tweet_text)
+                if matched_keywords:
+                    tweet['matched_keywords'] = matched_keywords
                     new_alpha_tweets.append(tweet)
-                    logger.info(f"发现Alpha推文: {tweet_id} (长度: {len(tweet['text'])}字符)")
+                    logger.info(f"发现Alpha推文: {tweet_id} (长度: {len(tweet_text)}字符)")
+                else:
+                    logger.info(f"推文 {tweet_id} 不包含Alpha关键词")
                 
                 # 标记为已处理
                 self.processed_ids.append(tweet_id)
@@ -285,7 +322,8 @@ class BinanceTwitterMonitor:
             new_alpha_tweets.sort(key=lambda x: x['created_at'])
             
             for tweet in new_alpha_tweets:
-                message = self.format_message(tweet)
+                matched_keywords = tweet.get('matched_keywords', [])
+                message = self.format_message(tweet, matched_keywords)
                 self.send_wechat_message(message)
                 time.sleep(3)  # 避免频率限制
             
