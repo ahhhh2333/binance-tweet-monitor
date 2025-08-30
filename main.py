@@ -283,6 +283,7 @@ class BinanceTwitterMonitor:
 
 🔗 链接: {tweet_url}
 
+💰 #币安 #Alpha积分 #推特监控"""
     
     def run(self):
         """运行监控"""
