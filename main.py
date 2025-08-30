@@ -273,14 +273,11 @@ class BinanceTwitterMonitor:
         # 获取完整推文内容
         full_text = tweet['text']
         
-        return f"""🚀 币安Alpha积分推文提醒
-
-📝 内容: {full_text}
+        return f"""📝 内容: {full_text}
 
 🕐 时间: {beijing_time.strftime('%Y-%m-%d %H:%M:%S')} (北京时间)
 
-🔗 链接: {tweet_url}
-
+🔗 链接: {tweet_url}"""
     
     def run(self):
         """运行监控"""
