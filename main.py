@@ -55,7 +55,7 @@ class BinanceTwitterMonitor:
         
         # 数据文件
         self.data_file = 'processed_tweets.json'
-        self.processed_ids = self._load_processed_tweets()
+        self.processed_data = self._load_processed_tweets()
         
         logger.info(f"初始化完成，共{len(self.bearer_tokens)}个Token，{len(self.alpha_keywords)}个关键词")
     
@@ -80,26 +80,37 @@ class BinanceTwitterMonitor:
         
         return tokens
     
-    def _load_processed_tweets(self) -> List[str]:
-        """加载已处理的推文ID"""
+    def _load_processed_tweets(self) -> Dict[str, Any]:
+        """加载已处理的推文数据"""
         try:
             if os.path.exists(self.data_file):
                 with open(self.data_file, 'r', encoding='utf-8') as f:
                     data = json.load(f)
-                    return data.get('processed_ids', [])
+                    # 确保数据结构正确
+                    if 'processed_ids' not in data:
+                        data['processed_ids'] = []
+                    if 'alpha_sent_ids' not in data:
+                        data['alpha_sent_ids'] = []
+                    return data
         except Exception as e:
             logger.error(f"加载数据文件失败: {e}")
-        return []
+        
+        return {
+            'processed_ids': [],      # 所有已处理的推文ID
+            'alpha_sent_ids': [],     # 已发送过Alpha通知的推文ID
+            'last_update': None
+        }
     
     def _save_processed_tweets(self):
-        """保存已处理的推文ID"""
+        """保存已处理的推文数据"""
         try:
-            data = {
-                'processed_ids': self.processed_ids[-1000:],  # 只保留最近1000条
-                'last_update': datetime.now().isoformat()
-            }
+            # 只保留最近1000条记录
+            self.processed_data['processed_ids'] = self.processed_data['processed_ids'][-1000:]
+            self.processed_data['alpha_sent_ids'] = self.processed_data['alpha_sent_ids'][-1000:]
+            self.processed_data['last_update'] = datetime.now().isoformat()
+            
             with open(self.data_file, 'w', encoding='utf-8') as f:
-                json.dump(data, f, ensure_ascii=False, indent=2)
+                json.dump(self.processed_data, f, ensure_ascii=False, indent=2)
         except Exception as e:
             logger.error(f"保存数据文件失败: {e}")
     
@@ -169,10 +180,10 @@ class BinanceTwitterMonitor:
         
         user_id = user_data['data']['id']
         
-        # 获取推文列表
+        # 获取推文列表 - 改为5条以节省API额度
         tweets_url = f"https://api.twitter.com/2/users/{user_id}/tweets"
         tweets_params = {
-            'max_results': 10,
+            'max_results': 5,
             'tweet.fields': 'created_at,public_metrics,entities,context_annotations',
             'exclude': 'retweets,replies'
         }
@@ -272,7 +283,6 @@ class BinanceTwitterMonitor:
 
 🔗 链接: {tweet_url}
 
-💰 #币安 #Alpha积分 #推特监控"""
     
     def run(self):
         """运行监控"""
@@ -301,22 +311,25 @@ class BinanceTwitterMonitor:
                 
                 logger.info(f"检查推文 {tweet_id}: {tweet_text[:50]}...")
                 
-                # 跳过已处理的推文
-                if tweet_id in self.processed_ids:
-                    logger.info(f"推文 {tweet_id} 已处理过，跳过")
-                    continue
-                
                 # 检查是否包含Alpha关键词
                 matched_keywords = self.contains_alpha_keywords(tweet_text)
+                
                 if matched_keywords:
-                    tweet['matched_keywords'] = matched_keywords
-                    new_alpha_tweets.append(tweet)
-                    logger.info(f"发现Alpha推文: {tweet_id} (长度: {len(tweet_text)}字符)")
+                    # 检查是否已经发送过Alpha通知
+                    if tweet_id in self.processed_data['alpha_sent_ids']:
+                        logger.info(f"推文 {tweet_id} 已发送过Alpha通知，跳过")
+                    else:
+                        tweet['matched_keywords'] = matched_keywords
+                        new_alpha_tweets.append(tweet)
+                        logger.info(f"发现Alpha推文: {tweet_id} (长度: {len(tweet_text)}字符)")
+                        # 标记为已发送Alpha通知
+                        self.processed_data['alpha_sent_ids'].append(tweet_id)
                 else:
                     logger.info(f"推文 {tweet_id} 不包含Alpha关键词")
                 
-                # 标记为已处理
-                self.processed_ids.append(tweet_id)
+                # 标记为已处理（无论是否包含Alpha关键词）
+                if tweet_id not in self.processed_data['processed_ids']:
+                    self.processed_data['processed_ids'].append(tweet_id)
             
             # 按时间顺序发送通知（从旧到新）
             new_alpha_tweets.sort(key=lambda x: x['created_at'])
